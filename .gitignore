@@ -1,6 +1,6 @@
 # Common ignores
-/bin/
-/obj/
+*/bin/
+*/obj/
 /certs/
 */Debug/
 */Release/
