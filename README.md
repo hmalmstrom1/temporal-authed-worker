@@ -1,6 +1,8 @@
 # Temporal Secure Worker
 
 ## Overview
+Warning: this is an expiremental implementation and is not recommended for production use.
+It's just a POC to see if I can get an OAuth 2.0 flow working with Temporal Workers paired with TLS.
 
 This repository contains a secure worker for Temporal that uses OAuth 2.0 for authentication.
 
