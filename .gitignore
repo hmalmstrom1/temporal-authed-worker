@@ -93,3 +93,6 @@ __pycache__/
 /.next/
 /.gatsby-cache/
 /.nuxt/
+
+# Specific files
+server-go/temporal-custom-server
