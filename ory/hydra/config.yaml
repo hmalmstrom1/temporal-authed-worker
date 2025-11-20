@@ -1,0 +1,23 @@
+version: v1.10.6
+dsn: postgres://temporal:temporal@postgres-ory:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+serve:
+  public:
+    port: 4444
+  admin:
+    port: 4445
+urls:
+  self:
+    issuer: http://127.0.0.1:4444
+  consent: http://127.0.0.1:3000/consent
+  login: http://127.0.0.1:3000/login
+  logout: http://127.0.0.1:3000/logout
+secrets:
+  system:
+    - youReallyNeedToChangeThis
+oidc:
+  subject_identifiers:
+    supported_types:
+      - public
+      - pairwise
+    pairwise:
+      salt: youReallyNeedToChangeThis

@@ -1,0 +1,139 @@
+version: '3.5'
+
+services:
+  cassandra:
+    image: cassandra:3.11
+    ports:
+      - "9042:9042"
+    environment:
+      - "CASSANDRA_CLUSTER_NAME=temporal"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.10.1
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  temporal:
+    build: ./server-go
+    environment:
+      - "CASSANDRA_SEEDS=cassandra"
+      - "ES_SEEDS=elasticsearch"
+      - "ES_VERSION=v7"
+      - "TEMPORAL_TLS_FRONTEND_CERT=/etc/temporal/certs/server.cert"
+      - "TEMPORAL_TLS_FRONTEND_KEY=/etc/temporal/certs/server.key"
+      - "TEMPORAL_TLS_FRONTEND_CLIENT_CA_CERT=/etc/temporal/certs/ca.cert"
+      - "TEMPORAL_TLS_INTERNODE_SERVER_CERT=/etc/temporal/certs/server.cert"
+      - "TEMPORAL_TLS_INTERNODE_SERVER_KEY=/etc/temporal/certs/server.key"
+      - "TEMPORAL_TLS_INTERNODE_CLIENT_CA_CERT=/etc/temporal/certs/ca.cert"
+      # Enable Authorizer
+      - "TEMPORAL_CLI_ADDRESS=temporal:7233"
+    ports:
+      - "7233:7233"
+    volumes:
+      - ./certs:/etc/temporal/certs
+    depends_on:
+      - cassandra
+      - elasticsearch
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    environment:
+      - "TEMPORAL_ADDRESS=temporal:7233"
+      - "TEMPORAL_CORS_ORIGINS=http://localhost:3000"
+      # UI needs to talk TLS to frontend if frontend is TLS
+      - "TEMPORAL_TLS_CA=/etc/temporal/certs/ca.cert"
+      - "TEMPORAL_TLS_CERT=/etc/temporal/certs/client.cert"
+      - "TEMPORAL_TLS_KEY=/etc/temporal/certs/client.key"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./certs:/etc/temporal/certs
+    depends_on:
+      - temporal
+
+  postgres-ory:
+    image: postgres:13
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=temporal
+      - POSTGRES_PASSWORD=temporal
+      - POSTGRES_DB=temporal
+    volumes:
+      - postgres-ory-data:/var/lib/postgresql/data
+      - ./ory/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U temporal" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  hydra-migrate:
+    image: oryd/hydra:v1.10.6
+    environment:
+      - DSN=postgres://temporal:temporal@postgres-ory:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+    command: migrate sql -e --yes
+    depends_on:
+      postgres-ory:
+        condition: service_healthy
+
+  hydra:
+    image: oryd/hydra:v1.10.6
+    ports:
+      - "4444:4444" # Public port
+      - "4445:4445" # Admin port
+    command: serve all --dangerous-force-http
+    volumes:
+      - ./ory/hydra/config.yaml:/etc/config/hydra/hydra.yaml
+    environment:
+      - DSN=postgres://temporal:temporal@postgres-ory:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+      - URLS_SELF_ISSUER=http://127.0.0.1:4444
+      - URLS_CONSENT=http://127.0.0.1:3000/consent
+      - URLS_LOGIN=http://127.0.0.1:3000/login
+      - URLS_LOGOUT=http://127.0.0.1:3000/logout
+      - SECRETS_SYSTEM=youReallyNeedToChangeThis
+      - OIDC_SUBJECT_IDENTIFIERS_SUPPORTED_TYPES=public,pairwise
+      - OIDC_SUBJECT_IDENTIFIERS_PAIRWISE_SALT=youReallyNeedToChangeThis
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+      postgres-ory:
+        condition: service_healthy
+
+  kratos-migrate:
+    image: oryd/kratos:v0.13.0
+    environment:
+      - DSN=postgres://temporal:temporal@postgres-ory:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+    volumes:
+      - ./ory/kratos:/etc/config/kratos
+    command: -c /etc/config/kratos/config.yaml migrate sql -e --yes
+    depends_on:
+      postgres-ory:
+        condition: service_healthy
+
+  kratos:
+    image: oryd/kratos:v0.13.0
+    ports:
+      - "4433:4433" # Public port
+      - "4434:4434" # Admin port
+    environment:
+      - DSN=postgres://temporal:temporal@postgres-ory:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+    command: serve -c /etc/config/kratos/config.yaml --dev
+    volumes:
+      - ./ory/kratos:/etc/config/kratos
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+      postgres-ory:
+        condition: service_healthy
+
+volumes:
+  postgres-ory-data:
