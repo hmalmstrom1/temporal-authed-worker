@@ -39,7 +39,8 @@ namespace TemporalWorkerApp
             // Setup OAuth
             var tokenProvider = new OAuthTokenProvider(oauthTokenUrl, oauthClientId, oauthClientSecret);
             var token = await tokenProvider.GetTokenAsync();
-            
+
+	    logger.LogInformation($"Received a token of  {token}");
             // Setup TLS
             TlsOptions tlsOptions = null;
             if (!string.IsNullOrEmpty(tlsRootCaPath))

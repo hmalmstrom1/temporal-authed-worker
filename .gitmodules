@@ -1,0 +1,3 @@
+[submodule "temporal-src"]
+	path = temporal-src
+	url = https://github.com/temporalio/temporal.git

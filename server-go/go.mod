@@ -2,7 +2,10 @@ module github.com/example/temporal-custom-server
 
 go 1.25.0
 
-require go.temporal.io/server v1.29.1
+require (
+	github.com/golang-jwt/jwt/v5 v5.3.0
+	go.temporal.io/server v1.29.1
+)
 
 require (
 	cel.dev/expr v0.20.0 // indirect
@@ -46,7 +49,6 @@ require (
 	github.com/gocql/gocql v1.7.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
-	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
