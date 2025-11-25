@@ -35,7 +35,8 @@ namespace TemporalWorkerApp.Auth
             {
                 Address = _tokenUrl,
                 ClientId = _clientId,
-                ClientSecret = _clientSecret
+                ClientSecret = _clientSecret,
+                ClientCredentialStyle = ClientCredentialStyle.PostBody
             }, cancellationToken);
 
             if (tokenResponse.IsError)

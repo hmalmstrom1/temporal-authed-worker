@@ -1,11 +1,13 @@
 package main
 
 import (
-	"github.com/example/temporal-custom-server/plugins"
 	"go.temporal.io/server/common/authorization"
 	"go.temporal.io/server/common/config"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/temporal"
+
+	"github.com/example/temporal-custom-server/authorizer"
+	"github.com/example/temporal-custom-server/claims"
 )
 
 func main() {
@@ -14,9 +16,9 @@ func main() {
 
 	s, err := temporal.NewServer(
 		temporal.ForServices(temporal.DefaultServices),
-		temporal.WithAuthorizer(plugins.NewSimpleTokenAuthorizer(logger)),
+		temporal.WithAuthorizer(authorizer.NewJwtAuthorizer()),
 		temporal.WithClaimMapper(func(cfg *config.Config) authorization.ClaimMapper {
-			return plugins.NewSimpleTokenClaimMapper(logger)
+			return claims.NewTLSClaimMapper(logger)
 		}),
 	)
 	if err != nil {
@@ -27,4 +29,7 @@ func main() {
 	if err := s.Start(); err != nil {
 		panic(err)
 	}
+
+	// Block forever (or handle signals properly)
+	select {}
 }

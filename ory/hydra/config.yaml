@@ -1,5 +1,7 @@
 version: v1.10.6
 dsn: postgres://temporal:temporal@postgres-ory:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+strategies:
+  access_token: jwt
 serve:
   public:
     port: 4444

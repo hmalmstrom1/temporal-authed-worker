@@ -1,5 +1,3 @@
-version: '3.5'
-
 services:
   cassandra:
     image: cassandra:3.11
@@ -7,6 +5,11 @@ services:
       - "9042:9042"
     environment:
       - "CASSANDRA_CLUSTER_NAME=temporal"
+    healthcheck:
+      test: [ "CMD", "cqlsh", "-e", "describe keyspaces" ]
+      interval: 15s
+      timeout: 30s
+      retries: 10
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.10.1
@@ -27,21 +30,38 @@ services:
       - "CASSANDRA_SEEDS=cassandra"
       - "ES_SEEDS=elasticsearch"
       - "ES_VERSION=v7"
-      - "TEMPORAL_TLS_FRONTEND_CERT=/etc/temporal/certs/server.cert"
-      - "TEMPORAL_TLS_FRONTEND_KEY=/etc/temporal/certs/server.key"
-      - "TEMPORAL_TLS_FRONTEND_CLIENT_CA_CERT=/etc/temporal/certs/ca.cert"
-      - "TEMPORAL_TLS_INTERNODE_SERVER_CERT=/etc/temporal/certs/server.cert"
-      - "TEMPORAL_TLS_INTERNODE_SERVER_KEY=/etc/temporal/certs/server.key"
-      - "TEMPORAL_TLS_INTERNODE_CLIENT_CA_CERT=/etc/temporal/certs/ca.cert"
+      # - "TEMPORAL_TLS_FRONTEND_CERT=/etc/temporal/certs/server.cert"
+      # - "TEMPORAL_TLS_FRONTEND_KEY=/etc/temporal/certs/server.key"
+      # - "TEMPORAL_TLS_FRONTEND_CLIENT_CA_CERT=/etc/temporal/certs/ca.cert"
+      # - "TEMPORAL_TLS_INTERNODE_SERVER_CERT=/etc/temporal/certs/server.cert"
+      # - "TEMPORAL_TLS_INTERNODE_SERVER_KEY=/etc/temporal/certs/server.key"
+      # - "TEMPORAL_TLS_INTERNODE_CLIENT_CA_CERT=/etc/temporal/certs/ca.cert"
       # Enable Authorizer
       - "TEMPORAL_CLI_ADDRESS=temporal:7233"
+      - "TEMPORAL_BROADCAST_ADDRESS=temporal"
     ports:
       - "7233:7233"
     volumes:
       - ./certs:/etc/temporal/certs
     depends_on:
-      - cassandra
-      - elasticsearch
+      temporal-init:
+        condition: service_completed_successfully
+      cassandra:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
+
+  temporal-init:
+    image: temporalio/auto-setup:latest
+    environment:
+      - "CASSANDRA_SEEDS=cassandra"
+    volumes:
+      - ./scripts:/etc/temporal/scripts
+      - ./temporal-src/schema:/etc/temporal/schema
+    entrypoint: [ "/bin/bash", "/etc/temporal/scripts/setup-temporal-schema.sh" ]
+    depends_on:
+      cassandra:
+        condition: service_healthy
 
   temporal-ui:
     image: temporalio/ui:latest
@@ -49,9 +69,9 @@ services:
       - "TEMPORAL_ADDRESS=temporal:7233"
       - "TEMPORAL_CORS_ORIGINS=http://localhost:3000"
       # UI needs to talk TLS to frontend if frontend is TLS
-      - "TEMPORAL_TLS_CA=/etc/temporal/certs/ca.cert"
-      - "TEMPORAL_TLS_CERT=/etc/temporal/certs/client.cert"
-      - "TEMPORAL_TLS_KEY=/etc/temporal/certs/client.key"
+      # - "TEMPORAL_TLS_CA=/etc/temporal/certs/ca.cert"
+      # - "TEMPORAL_TLS_CERT=/etc/temporal/certs/client.cert"
+      # - "TEMPORAL_TLS_KEY=/etc/temporal/certs/client.key"
     ports:
       - "8080:8080"
     volumes:
@@ -90,7 +110,7 @@ services:
     ports:
       - "4444:4444" # Public port
       - "4445:4445" # Admin port
-    command: serve all --dangerous-force-http
+    command: serve all --dangerous-force-http -c /etc/config/hydra/hydra.yaml
     volumes:
       - ./ory/hydra/config.yaml:/etc/config/hydra/hydra.yaml
     environment:
@@ -134,6 +154,25 @@ services:
         condition: service_completed_successfully
       postgres-ory:
         condition: service_healthy
+
+  worker:
+    build: ./worker-csharp
+    environment:
+      - "TEMPORAL_ADDRESS=temporal:7233"
+      - "TEMPORAL_NAMESPACE=default"
+      - "OAUTH_CLIENT_ID=temporal-worker"
+      - "OAUTH_CLIENT_SECRET=secret-temporal-worker"
+      - "OAUTH_TOKEN_URL=http://hydra:4444/oauth2/token"
+      - "LOG_LEAK_SENSITIVE_VALUES=true"
+      # - "TLS_CERT_PATH=/etc/temporal/certs/client.cert"
+      # - "TLS_KEY_PATH=/etc/temporal/certs/client.key"
+      # - "TLS_SERVER_ROOT_CA=/etc/temporal/certs/ca.cert"
+    volumes:
+      - ./certs:/etc/temporal/certs
+    depends_on:
+      - temporal
+      - hydra
+      - kratos
 
 volumes:
   postgres-ory-data:

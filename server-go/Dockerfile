@@ -1,4 +1,4 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
@@ -13,6 +13,7 @@ FROM alpine:3.18
 WORKDIR /app
 
 COPY --from=builder /app/temporal-server /usr/local/bin/temporal-server
+COPY --from=builder /app/config /app/config
 # Copy any necessary config files if we had them, but we'll use env vars and default config
 
 # Expose ports (Frontend, History, Matching, Worker)

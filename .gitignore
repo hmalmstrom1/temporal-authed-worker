@@ -15,7 +15,6 @@
 .coverage
 *.log
 *.log
-*.mod
 *.sum
 *.buildinfo
 *.buildinfo

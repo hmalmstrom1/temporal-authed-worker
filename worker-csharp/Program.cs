@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Temporalio.Client;
 using Temporalio.Worker;
+using Temporalio.Activities;
 using TemporalWorkerApp.Auth;
 
 namespace TemporalWorkerApp
@@ -37,6 +38,7 @@ namespace TemporalWorkerApp
 
             // Setup OAuth
             var tokenProvider = new OAuthTokenProvider(oauthTokenUrl, oauthClientId, oauthClientSecret);
+            var token = await tokenProvider.GetTokenAsync();
             
             // Setup TLS
             TlsOptions tlsOptions = null;
@@ -45,28 +47,28 @@ namespace TemporalWorkerApp
                 var rootCaBytes = await File.ReadAllBytesAsync(tlsRootCaPath);
                 tlsOptions = new TlsOptions
                 {
-                    // RootCertificateAuthorities property might be different.
-                    // tlsOptions.RootCertificateAuthorities = new[] { rootCaBytes };
-                    // Note: Check Temporalio docs for correct property name.
+                    ServerRootCACert = rootCaBytes
                 };
 
                 if (!string.IsNullOrEmpty(tlsCertPath) && !string.IsNullOrEmpty(tlsKeyPath))
                 {
-                    var certPem = await File.ReadAllTextAsync(tlsCertPath);
-                    var keyPem = await File.ReadAllTextAsync(tlsKeyPath);
-                    var clientCert = X509Certificate2.CreateFromPem(certPem, keyPem);
-                    // Note: ClientCertificates property might be different or require X509Certificate2Collection.
-                    // For now, we'll skip setting it to avoid build errors, as the user can uncomment and fix.
-                    // tlsOptions.ClientCertificates = new[] { clientCert };
+                    var certPem = await File.ReadAllBytesAsync(tlsCertPath);
+                    var keyPem = await File.ReadAllBytesAsync(tlsKeyPath);
+                    
+                    tlsOptions.ClientCert = certPem;
+                    tlsOptions.ClientPrivateKey = keyPem;
                 }
             }
 
-            // Create Client Options with Interceptor
+            // Create Client Options with RpcMetadata
             var clientOptions = new TemporalClientConnectOptions(temporalAddress)
             {
                 Namespace = temporalNamespace,
                 Tls = tlsOptions,
-                Interceptors = new[] { new OAuthInterceptor(tokenProvider) }
+                RpcMetadata = new Dictionary<string, string>
+                {
+                    { "Authorization", $"Bearer {token}" }
+                }
             };
 
             try
@@ -77,7 +79,8 @@ namespace TemporalWorkerApp
                 // Create Worker
                 using var worker = new TemporalWorker(
                     client,
-                    new TemporalWorkerOptions(taskQueue: "my-task-queue"));
+                    new TemporalWorkerOptions(taskQueue: "my-task-queue")
+                    .AddActivity(Hello));
 
                 logger.LogInformation("Starting worker...");
                 await worker.ExecuteAsync(CancellationToken.None);
@@ -87,5 +90,8 @@ namespace TemporalWorkerApp
                 logger.LogError(ex, "Failed to start worker");
             }
         }
+
+        [Activity]
+        public static string Hello(string name) => $"Hello {name}!";
     }
 }
