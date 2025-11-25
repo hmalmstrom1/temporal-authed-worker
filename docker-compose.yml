@@ -37,6 +37,8 @@ services:
       # - "TEMPORAL_TLS_INTERNODE_SERVER_KEY=/etc/temporal/certs/server.key"
       # - "TEMPORAL_TLS_INTERNODE_CLIENT_CA_CERT=/etc/temporal/certs/ca.cert"
       # Enable Authorizer
+      # - "TEMPORAL_AUTHORIZER=plugins/auth.go:NewSimpleTokenAuthorizer"
+      # - "TEMPORAL_CLAIM_MAPPER=plugins/auth.go:NewSimpleTokenClaimMapper"
       - "TEMPORAL_CLI_ADDRESS=temporal:7233"
       - "TEMPORAL_BROADCAST_ADDRESS=temporal"
     ports:
@@ -55,6 +57,11 @@ services:
     image: temporalio/auto-setup:latest
     environment:
       - "CASSANDRA_SEEDS=cassandra"
+      - "KEYSPACE=temporal"
+      - "DB=cassandra"
+      - "SKIP_SCHEMA_SETUP=false"
+      - "SKIP_DB_CREATE=false"
+      - "SKIP_DEFAULT_NAMESPACE_CREATION=true"
     volumes:
       - ./scripts:/etc/temporal/scripts
       - ./temporal-src/schema:/etc/temporal/schema
@@ -63,15 +70,25 @@ services:
       cassandra:
         condition: service_healthy
 
+  temporal-setup-namespace:
+    image: temporalio/admin-tools:latest
+    environment:
+      - "TEMPORAL_ADDRESS=temporal:7233"
+      - "TEMPORAL_CLI_ADDRESS=temporal:7233"
+    depends_on:
+      temporal:
+        condition: service_started
+    entrypoint: [ "/bin/sh", "-c", "temporal operator namespace create default --retention 1d || echo 'Namespace already exists'" ]
+
   temporal-ui:
     image: temporalio/ui:latest
     environment:
       - "TEMPORAL_ADDRESS=temporal:7233"
       - "TEMPORAL_CORS_ORIGINS=http://localhost:3000"
       # UI needs to talk TLS to frontend if frontend is TLS
-      # - "TEMPORAL_TLS_CA=/etc/temporal/certs/ca.cert"
-      # - "TEMPORAL_TLS_CERT=/etc/temporal/certs/client.cert"
-      # - "TEMPORAL_TLS_KEY=/etc/temporal/certs/client.key"
+      - "TEMPORAL_TLS_CA=/etc/temporal/certs/ca.cert"
+      - "TEMPORAL_TLS_CERT=/etc/temporal/certs/client.cert"
+      - "TEMPORAL_TLS_KEY=/etc/temporal/certs/client.key"
     ports:
       - "8080:8080"
     volumes:
@@ -173,6 +190,7 @@ services:
       - temporal
       - hydra
       - kratos
+      - temporal-setup-namespace
 
 volumes:
   postgres-ory-data:

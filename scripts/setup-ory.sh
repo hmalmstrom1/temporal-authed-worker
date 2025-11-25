@@ -23,7 +23,7 @@ docker compose exec hydra hydra clients create \
     --secret $CLIENT_SECRET \
     --grant-types client_credentials \
     --response-types token,code,id_token \
-    --scope openid,offline \
+    --scope openid,offline,worker \
     --audience temporal
 
 echo "Client created."
@@ -34,7 +34,7 @@ echo "Performing Client Credentials Flow to get a token..."
 TOKEN_RESPONSE=$(curl -s -X POST http://localhost:4444/oauth2/token \
     -u "$CLIENT_ID:$CLIENT_SECRET" \
     -d "grant_type=client_credentials" \
-    -d "scope=openid")
+    -d "scope=openid,worker")
 
 echo "Token Response:"
 echo $TOKEN_RESPONSE | jq .

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/api/enums/v1"
+	"go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
 )
 
@@ -57,12 +58,41 @@ func TestSystem(t *testing.T) {
 
 		// Verify Worker is polling 'my-task-queue'
 		// We use DescribeTaskQueue to check if there are pollers
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		var resp *workflowservice.DescribeTaskQueueResponse
+		for {
+			resp, err = c.DescribeTaskQueue(ctx, "my-task-queue", enums.TASK_QUEUE_TYPE_ACTIVITY)
+			require.NoError(t, err, "Failed to describe task queue")
+
+			if len(resp.Pollers) > 0 {
+				break
+			}
+
+			select {
+			case <-ctx.Done():
+				break
+			case <-time.After(1 * time.Second):
+				continue
+			}
+		}
+
+		assert.NotEmpty(t, resp.Pollers, "No pollers found on 'my-task-queue'. Worker might not be connected.")
+	})
+	// 4. Test Namespace Registration
+	t.Run("NamespaceRegistration", func(t *testing.T) {
+		// Connect to Temporal Namespace Client
+		nc, err := client.NewNamespaceClient(client.Options{
+			HostPort: "localhost:7233",
+		})
+		require.NoError(t, err, "Failed to create Temporal namespace client")
+		defer nc.Close()
+
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		resp, err := c.DescribeTaskQueue(ctx, "my-task-queue", enums.TASK_QUEUE_TYPE_WORKFLOW)
-		require.NoError(t, err, "Failed to describe task queue")
-
-		assert.NotEmpty(t, resp.Pollers, "No pollers found on 'my-task-queue'. Worker might not be connected.")
+		_, err = nc.Describe(ctx, "default")
+		assert.NoError(t, err, "Default namespace should exist")
 	})
 }

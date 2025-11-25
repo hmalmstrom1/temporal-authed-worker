@@ -50,7 +50,7 @@ func (a *tlsClaimMapper) GetClaims(authInfo *authorization.AuthInfo) (*authoriza
 				// Example: if scp contains "temporal:writer", grant writer role
 				if scp, ok := mapClaims["scp"].([]interface{}); ok {
 					for _, s := range scp {
-						if str, ok := s.(string); ok && str == "temporal:writer" {
+						if str, ok := s.(string); ok && (str == "temporal:writer" || str == "worker") {
 							if claims.Namespaces == nil {
 								claims.Namespaces = make(map[string]authorization.Role)
 							}
