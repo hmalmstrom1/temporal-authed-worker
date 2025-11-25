@@ -86,9 +86,9 @@ services:
       - "TEMPORAL_ADDRESS=temporal:7233"
       - "TEMPORAL_CORS_ORIGINS=http://localhost:3000"
       # UI needs to talk TLS to frontend if frontend is TLS
-      - "TEMPORAL_TLS_CA=/etc/temporal/certs/ca.cert"
-      - "TEMPORAL_TLS_CERT=/etc/temporal/certs/client.cert"
-      - "TEMPORAL_TLS_KEY=/etc/temporal/certs/client.key"
+      # - "TEMPORAL_TLS_CA=/etc/temporal/certs/ca.cert"
+      # - "TEMPORAL_TLS_CERT=/etc/temporal/certs/client.cert"
+      # - "TEMPORAL_TLS_KEY=/etc/temporal/certs/client.key"
     ports:
       - "8080:8080"
     volumes:
@@ -191,6 +191,7 @@ services:
       - hydra
       - kratos
       - temporal-setup-namespace
+      - temporal-ui
 
 volumes:
   postgres-ory-data:
