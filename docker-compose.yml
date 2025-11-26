@@ -95,6 +95,7 @@ services:
       - ./certs:/etc/temporal/certs
     depends_on:
       - temporal
+      - temporal-setup-namespace
 
   postgres-ory:
     image: postgres:13
