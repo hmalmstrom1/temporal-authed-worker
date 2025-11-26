@@ -81,7 +81,7 @@ namespace TemporalWorkerApp
                 using var worker = new TemporalWorker(
                     client,
                     new TemporalWorkerOptions(taskQueue: "my-task-queue")
-                    .AddActivity(Hello));
+                    .AddWorkflow<TemporalWorkerApp.Greetings>());
 
                 logger.LogInformation("Starting worker...");
                 await worker.ExecuteAsync(CancellationToken.None);
@@ -92,7 +92,6 @@ namespace TemporalWorkerApp
             }
         }
 
-        [Activity]
-        public static string Hello(string name) => $"Hello {name}!";
+
     }
 }
